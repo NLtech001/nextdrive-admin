@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Withdraw Requests - Admin</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1e293b;
+      color: white;
+      padding: 18px 20px;
+      font-size: 21px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .container { padding: 20px; max-width: 1100px; margin: 0 auto; }
+
+    .section { 
+      margin-bottom: 40px; 
+      background: white;
+      border-radius: 16px;
+      padding: 25px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    }
+
+    h2 { font-size: 1.8rem; margin-bottom: 20px; color: #1e293b; }
+
+    .request-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+      border-left: 5px solid #f59e0b;
+    }
+
+    .request-info {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px 20px;
+      font-size: 15px;
+      margin-bottom: 18px;
+    }
+
+    .request-info strong {
+      display: block;
+      color: #475569;
+      margin-bottom: 4px;
+      font-size: 0.95rem;
+    }
+
+    .amount {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #ef4444;
+    }
+
+    .payment-details {
+      grid-column: 1 / -1;
+      background: #f8fafc;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14.5px;
+      line-height: 1.5;
+      border: 1px solid #e2e8f0;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .action-btn {
+      flex: 1;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+    }
+
+    .approve-btn { background: #10b981; color: white; }
+    .reject-btn { background: #ef4444; color: white; }
+
+    .empty {
+      text-align: center;
+      padding: 120px 20px;
+      color: #64748b;
+      font-size: 1.35rem;
+      line-height: 1.6;
+    }
+
+    .time {
+      font-size: 0.95rem;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>Withdraw Requests</div>
+  <div style="font-size:15px; opacity:0.85;">Admin Panel</div>
+</header>
+
+<div class="container">
+  <div class="section">
+    <h2><i class="fas fa-list"></i> Pending Withdrawal Requests</h2>
+    <div id="requestsContainer"></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
+
+<script>
+// Firebase Config
+const firebaseConfig = {
+  apiKey: "AIzaSyAWsnuljcbCQgly7fhSh_n9_Q1j1ZtC7rU",
+  authDomain: "bdclash-80f60.firebaseapp.com",
+  projectId: "bdclash-80f60",
+  storageBucket: "bdclash-80f60.firebasestorage.app",
+  messagingSenderId: "842550397820",
+  appId: "1:842550397820:web:285ed51565a4d71d34b2f9"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Load Pending Withdraw Requests
+function loadWithdrawRequests() {
+  const container = document.getElementById("requestsContainer");
+
+  db.collection("cashout_requests")
+    .where("status", "==", "pending")
+    .orderBy("requestedAt", "desc")
+    .onSnapshot(snapshot => {
+      container.innerHTML = "";
+
+      if (snapshot.empty) {
+        container.innerHTML = `<div class="empty">কোনো পেন্ডিং উইথড্রয়াল রিকোয়েস্ট নেই</div>`;
+        return;
+      }
+
+      snapshot.forEach(doc => {
+        const req = doc.data();
+        const time = req.requestedAt 
+          ? req.requestedAt.toDate().toLocaleString('bn-BD', {
+              year: 'numeric', month: 'short', day: 'numeric',
+              hour: '2-digit', minute: '2-digit', hour12: true
+            }) 
+          : "—";
+
+        let paymentDetailsHTML = "";
+        if (req.paymentDetails) {
+          if (req.method === "bkash" || req.method === "nagad") {
+            paymentDetailsHTML = `<strong>${req.method.toUpperCase()} নম্বর:</strong> ${req.paymentDetails.mobileNumber || '—'}`;
+          } else if (req.method === "bank") {
+            paymentDetailsHTML = `
+              <strong>ব্যাংকের নাম:</strong> ${req.paymentDetails.bankName || '—'}<br>
+              <strong>একাউন্ট নাম:</strong> ${req.paymentDetails.accountName || '—'}<br>
+              <strong>একাউন্ট নম্বর:</strong> ${req.paymentDetails.accountNumber || '—'}<br>
+              ${req.paymentDetails.routingNumber ? `<strong>রাউটিং/ব্রাঞ্চ:</strong> ${req.paymentDetails.routingNumber}` : ''}
+            `;
+          }
+        }
+
+        const card = document.createElement("div");
+        card.className = "request-card";
+        card.innerHTML = `
+          <div class="request-info">
+            <div><strong>সময়:</strong><br><span class="time">${time}</span></div>
+            <div><strong>ইউজার:</strong><br>${req.userPhone || req.userId.substring(0,12) + '...'}</div>
+            <div><strong>পরিমাণ:</strong><br><span class="amount">৳ ${Number(req.amount).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</span></div>
+            <div><strong>মেথড:</strong><br>${req.method.toUpperCase()}</div>
+          </div>
+
+          ${paymentDetailsHTML ? `<div class="payment-details">${paymentDetailsHTML}</div>` : ''}
+
+          <div class="action-buttons">
+            <button class="action-btn approve-btn" onclick="approveWithdraw('${doc.id}', ${req.amount}, '${req.userId}')">
+              <i class="fas fa-check-circle"></i> Approve
+            </button>
+            <button class="action-btn reject-btn" onclick="rejectWithdraw('${doc.id}')">
+              <i class="fas fa-times-circle"></i> Reject
+            </button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }, error => {
+      console.error("Error loading requests:", error);
+      container.innerHTML = `<div class="empty">ডাটা লোড করতে সমস্যা হয়েছে</div>`;
+    });
+}
+
+// Approve Withdrawal
+async function approveWithdraw(requestId, amount, userId) {
+  if (!confirm(`৳ ${amount} উইথড্র করার অনুমোদন দিবেন?`)) return;
+
+  try {
+    await db.collection("cashout_requests").doc(requestId).update({
+      status: "approved",
+      approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      approvedBy: "Admin"
+    });
+
+    await db.collection("users").doc(userId).update({
+      balance: firebase.firestore.FieldValue.increment(-Number(amount))
+    });
+
+    alert("✅ উইথড্রয়াল অনুমোদিত হয়েছে!");
+  } catch (err) {
+    console.error(err);
+    alert("সমস্যা: " + err.message);
+  }
+}
+
+// Reject Withdrawal
+async function rejectWithdraw(requestId) {
+  if (!confirm("এই উইথড্রয়াল রিকোয়েস্ট প্রত্যাখ্যান করবেন?")) return;
+
+  try {
+    await db.collection("cashout_requests").doc(requestId).update({
+      status: "rejected",
+      approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      approvedBy: "Admin"
+    });
+    alert("রিকোয়েস্ট প্রত্যাখ্যাত হয়েছে");
+  } catch (err) {
+    console.error(err);
+    alert("সমস্যা: " + err.message);
+  }
+}
+
+// Initialize
+window.onload = () => {
+  loadWithdrawRequests();
+};
+</script>
+
+</body>
+</html>

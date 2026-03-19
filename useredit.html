@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit User - Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    * { box-sizing: border-box; margin:0; padding:0; }
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      padding: 15px;
+    }
+    .container {
+      max-width: 1000px;
+      margin: auto;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    header {
+      background: #1a73e8;
+      color: white;
+      padding: 20px;
+      text-align: center;
+      font-size: 1.6rem;
+    }
+    .section {
+      padding: 25px;
+      border-bottom: 1px solid #eee;
+    }
+    .section:last-child { border-bottom: none; }
+    h2 { margin: 0 0 15px; color: #333; }
+    .form-group { margin: 15px 0; }
+    label { display: block; margin-bottom: 6px; font-weight: 500; }
+    input, select, button {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+    input[readonly] { background: #f9f9f9; }
+    .btn {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      margin: 8px 5px 0 0;
+      color: white;
+    }
+    .btn-primary    { background: #1a73e8; }
+    .btn-ban        { background: #d32f2f; }
+    .btn-unban      { background: #388e3c; }
+    .btn-delete     { background: #b71c1c; }
+    .history-table  { width:100%; border-collapse: collapse; margin-top:10px; }
+    .history-table th, .history-table td { padding:10px; text-align:left; border-bottom:1px solid #eee; }
+    .status-banned  { color:#d32f2f; font-weight:bold; }
+    .status-active  { color:#388e3c; font-weight:bold; }
+    .error-box {
+      background: #ffebee;
+      color: #c62828;
+      padding: 20px;
+      margin: 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .current-pkg { margin-top: 12px; font-weight: 500; color: #444; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>👤 User Edit - <span id="uidDisplay">Loading...</span></header>
+
+  <div id="errorMessage" class="error-box" style="display:none;"></div>
+
+  <div id="content" style="display:none;">
+    <!-- Basic Info -->
+    <div class="section">
+      <h2>Basic Information</h2>
+      <div class="form-group"><label>Email</label><input id="email" readonly></div>
+      <div class="form-group"><label>Name</label><input id="name"></div>
+      <div class="form-group"><label>Phone</label><input id="phone"></div>
+      <button class="btn btn-primary" onclick="saveBasicInfo()">Save Basic Info</button>
+    </div>
+
+    <!-- Ban / Unban -->
+    <div class="section">
+      <h2>Ban / Unban</h2>
+      <p>Current Status: <span id="banStatus" class="status-active">Checking...</span></p>
+      <button id="banBtn" class="btn btn-ban" onclick="toggleBan()">BAN USER</button>
+      <button id="unbanBtn" class="btn btn-unban" style="display:none;" onclick="toggleBan()">UNBAN USER</button>
+    </div>
+
+    <!-- Membership / Package Assign -->
+    <div class="section">
+      <h2>Assign Membership / Package</h2>
+      <div class="form-group">
+        <label>Select Package</label>
+        <select id="packageSelect">
+          <option value="">Loading packages...</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="assignMembership()">Assign This Package</button>
+      <div id="currentMembership" class="current-pkg">Loading current membership...</div>
+    </div>
+
+    <!-- Login History -->
+    <div class="section">
+      <h2>Login History (last 20)</h2>
+      <table class="history-table">
+        <thead><tr><th>Date & Time</th></tr></thead>
+        <tbody id="historyBody">
+          <tr><td style="text-align:center;color:#777;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="section">
+      <h2 style="color:#b71c1c;">Danger Zone</h2>
+      <button class="btn btn-delete" onclick="deleteAccount()">DELETE ACCOUNT PERMANENTLY</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK (9.23.0 ব্যবহার করা হচ্ছে আপনার কোড অনুযায়ী) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+// ================== Firebase Config ==================
+const firebaseConfig = {
+  apiKey: "AIzaSyAWsnuljcbCQgly7fhSh_n9_Q1j1ZtC7rU",
+  authDomain: "bdclash-80f60.firebaseapp.com",
+  projectId: "bdclash-80f60",
+  storageBucket: "bdclash-80f60.firebasestorage.app",
+  messagingSenderId: "842550397820",
+  appId: "1:842550397820:web:285ed51565a4d71d34b2f9",
+  measurementId: "G-DS97G2VVZ4"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ================== Get & Validate UID ==================
+const urlParams = new URLSearchParams(window.location.search);
+const uid = urlParams.get('uid')?.trim();
+
+if (!uid) {
+  showError("কোনো User ID পাওয়া যায়নি।<br>List page থেকে Edit বাটন ক্লিক করে আসুন।");
+} else {
+  document.getElementById('uidDisplay').textContent = uid;
+  document.getElementById('content').style.display = 'block';
+  loadUser();
+}
+
+// ================== Show Error Message ==================
+function showError(msg) {
+  const errDiv = document.getElementById('errorMessage');
+  errDiv.innerHTML = `❌ ${msg}<br><br><button onclick="window.history.back()" class="btn btn-primary">ফিরে যান</button>`;
+  errDiv.style.display = 'block';
+  document.getElementById('uidDisplay').textContent = 'Error';
+}
+
+// ================== Load User Data ==================
+async function loadUser() {
+  try {
+    const docRef = db.collection("users").doc(uid);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      showError("এই UID-এর কোনো ইউজার পাওয়া যায়নি।");
+      return;
+    }
+
+    const data = doc.data();
+
+    document.getElementById('email').value  = data.email      || "—";
+    document.getElementById('name').value   = data.name       || data.displayName || "";
+    document.getElementById('phone').value  = data.phone      || "";
+
+    // Ban status
+    const isBanned = !!data.banned;
+    document.getElementById('banStatus').textContent = isBanned ? 'BANNED' : 'Active';
+    document.getElementById('banStatus').className   = isBanned ? 'status-banned' : 'status-active';
+    document.getElementById('banBtn').style.display   = isBanned ? 'none' : 'inline-block';
+    document.getElementById('unbanBtn').style.display = isBanned ? 'inline-block' : 'none';
+
+    // Current Membership
+    updateCurrentMembershipDisplay(data.membership || null);
+
+    loadLoginHistory();
+    loadPackages();
+  } catch (e) {
+    console.error(e);
+    showError("ইউজার লোড করতে সমস্যা: " + e.message);
+  }
+}
+
+function updateCurrentMembershipDisplay(membership) {
+  const elem = document.getElementById('currentMembership');
+  if (!membership) {
+    elem.innerHTML = "কোনো সক্রিয় প্যাকেজ নেই";
+    return;
+  }
+
+  const expires = membership.expiresAt 
+    ? new Date(membership.expiresAt).toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric' })
+    : '—';
+
+  elem.innerHTML = `
+    বর্তমান প্যাকেজ: <strong>${membership.packageName || 'Unknown'}</strong><br>
+    Hall: <strong>${membership.hall || '—'}</strong> • Level: <strong>${membership.level || '—'}</strong><br>
+    মেয়াদ শেষ: ${expires}
+  `;
+}
+
+// ================== Save Basic Info ==================
+async function saveBasicInfo() {
+  try {
+    const updates = {};
+    const nameVal  = document.getElementById('name').value.trim();
+    const phoneVal = document.getElementById('phone').value.trim();
+
+    if (nameVal)  updates.name  = nameVal;
+    if (phoneVal) updates.phone = phoneVal;
+
+    if (Object.keys(updates).length === 0) {
+      return alert("কোনো পরিবর্তন করা হয়নি।");
+    }
+
+    await db.collection("users").doc(uid).update(updates);
+    alert("✅ Basic information updated!");
+  } catch (e) {
+    alert("Error: " + e.message);
+  }
+}
+
+// ================== Toggle Ban ==================
+async function toggleBan() {
+  try {
+    const doc = await db.collection("users").doc(uid).get();
+    const isBanned = !!doc.data().banned;
+
+    await db.collection("users").doc(uid).update({ banned: !isBanned });
+
+    alert(!isBanned ? "User has been BANNED!" : "User has been UNBANNED!");
+    location.reload();
+  } catch (e) {
+    alert("Error: " + e.message);
+  }
+}
+
+// ================== Load Packages ==================
+async function loadPackages() {
+  const select = document.getElementById('packageSelect');
+  select.innerHTML = '<option value="">Select Package...</option>';
+
+  try {
+    const snap = await db.collection("packages").get();
+    if (snap.empty) {
+      select.innerHTML += '<option disabled>কোনো প্যাকেজ পাওয়া যায়নি</option>';
+      return;
+    }
+
+    snap.forEach(doc => {
+      const p = doc.data();
+      const opt = document.createElement('option');
+      opt.value = doc.id;
+      opt.textContent = `${p.name || 'Unnamed'}  •  ${p.hall || '?'} - ${p.level || '?'}  •  ${p.price || '?'}৳ / ${p.durationDays || '?'} দিন`;
+      select.appendChild(opt);
+    });
+  } catch (e) {
+    console.error(e);
+    select.innerHTML += '<option disabled>প্যাকেজ লোডে সমস্যা</option>';
+  }
+}
+
+// ================== Assign Membership ==================
+async function assignMembership() {
+  const packageId = document.getElementById('packageSelect').value;
+  if (!packageId) return alert("একটা প্যাকেজ সিলেক্ট করুন");
+
+  try {
+    const pkgDoc = await db.collection("packages").doc(packageId).get();
+    if (!pkgDoc.exists) return alert("নির্বাচিত প্যাকেজ পাওয়া যায়নি");
+
+    const pkg = pkgDoc.data();
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + (pkg.durationDays || 30));
+
+    const membershipData = {
+      packageId:        packageId,
+      packageName:      pkg.name || "Unknown Package",
+      hall:             pkg.hall   || "Bronze Hall",
+      level:            pkg.level  || "Level 1",
+      assignedAt:       firebase.firestore.FieldValue.serverTimestamp(),
+      expiresAt:        expiresAt.toISOString(),
+      price:            pkg.price || 0,
+      durationDays:     pkg.durationDays || 30
+    };
+
+    await db.collection("users").doc(uid).update({
+      membership: membershipData
+    });
+
+    alert(`✅ প্যাকেজ অ্যাসাইন করা হয়েছে!\n${membershipData.hall} • ${membershipData.level}`);
+    
+    // UI আপডেট
+    updateCurrentMembershipDisplay(membershipData);
+  } catch (e) {
+    console.error(e);
+    alert("সমস্যা: " + e.message);
+  }
+}
+
+// ================== Load Login History ==================
+async function loadLoginHistory() {
+  const tbody = document.getElementById('historyBody');
+  tbody.innerHTML = '<tr><td style="text-align:center;color:#777;">Loading...</td></tr>';
+
+  try {
+    const snap = await db.collection("users").doc(uid)
+      .collection("loginHistory")
+      .orderBy("timestamp", "desc")
+      .limit(20)
+      .get();
+
+    tbody.innerHTML = "";
+
+    if (snap.empty) {
+      tbody.innerHTML = '<tr><td style="text-align:center;color:#777;">No login history found</td></tr>';
+      return;
+    }
+
+    snap.forEach(doc => {
+      const d = doc.data();
+      const time = d.timestamp ? new Date(d.timestamp.toDate()).toLocaleString('bn-BD') : '—';
+      const row = document.createElement('tr');
+      row.innerHTML = `<td>${time}</td>`;
+      tbody.appendChild(row);
+    });
+  } catch (e) {
+    tbody.innerHTML = '<tr><td style="text-align:center;color:#777;">History not available</td></tr>';
+    console.log(e);
+  }
+}
+
+// ================== Delete Account ==================
+async function deleteAccount() {
+  if (!confirm("⚠️ এই অ্যাকাউন্ট পুরোপুরি মুছে ফেলতে চান?\nএটা ফিরিয়ে আনা যাবে না!")) return;
+
+  try {
+    await db.collection("users").doc(uid).delete();
+    alert("✅ Account permanently deleted!");
+    window.location.href = "admin-users.html"; // ← আপনার users list page এর নাম দিন
+  } catch (e) {
+    alert("Delete করতে সমস্যা: " + e.message);
+  }
+}
+</script>
+
+</body>
+</html>
