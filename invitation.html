@@ -210,14 +210,14 @@ async function generateCode() {
       return;
     }
 
-    await db.collection("invitationCodes").doc(code).set({
-      code: code,
-      ownerName: owner,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      usedBy: null,           // null = not used yet
-      usedAt: null,
-      active: true
-    });
+await db.collection("invitationCodes").doc(code).set({
+  code: code,
+  ownerName: owner,
+  createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  usedBy: null,
+  usedAt: null,
+  active: true   // ← এখানে স্পষ্ট করে true দেওয়া আছে
+});
 
     generatedCodeDiv.textContent = code;
     generatedCodeDiv.style.display = 'block';
