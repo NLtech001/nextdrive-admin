@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Create Invitation Code</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    * { box-sizing: border-box; margin:0; padding:0; }
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    header {
+      background: #1a73e8;
+      color: white;
+      padding: 18px 24px;
+      font-size: 1.4rem;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .back-btn {
+      background: rgba(255,255,255,0.25);
+      border: none;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .back-btn:hover { background: rgba(255,255,255,0.4); }
+    .content {
+      padding: 30px 24px;
+    }
+    h2 {
+      margin-bottom: 20px;
+      color: #333;
+    }
+    .form-group {
+      margin-bottom: 24px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #444;
+    }
+    input, button {
+      width: 100%;
+      padding: 14px 16px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+    input[readonly] {
+      background: #f8f9fa;
+      color: #333;
+    }
+    .btn {
+      padding: 14px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1.05rem;
+      font-weight: 500;
+      color: white;
+      transition: 0.2s;
+    }
+    .btn-primary { background: #1a73e8; }
+    .btn-primary:hover { background: #0d65d6; }
+    .btn-copy {
+      background: #6c757d;
+      margin-top: 10px;
+    }
+    .btn-copy:hover { background: #5a6268; }
+    .message {
+      margin-top: 20px;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .success { background: #d4edda; color: #155724; }
+    .error   { background: #f8d7da; color: #721c24; }
+    .code-box {
+      font-size: 1.8rem;
+      font-weight: bold;
+      letter-spacing: 8px;
+      text-align: center;
+      margin: 20px 0;
+      padding: 16px;
+      background: #e9ecef;
+      border-radius: 8px;
+      user-select: all;
+    }
+    .list-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 30px;
+    }
+    .list-table th, .list-table td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+    .list-table th {
+      background: #f8f9fa;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    Create Invitation Code
+    <button class="back-btn" onclick="window.location.href='admin.html'">← Dashboard</button>
+  </header>
+
+  <div class="content">
+    <h2>New Invitation Code</h2>
+
+    <div class="form-group">
+      <label>Code Owner / Purpose / Name *</label>
+      <input type="text" id="ownerName" placeholder="যেমন: Branch Khulna, Agent Rahim, Promo March" required>
+    </div>
+
+    <button class="btn btn-primary" onclick="generateCode()">Generate 4-Digit Code</button>
+
+    <div id="generatedCode" class="code-box" style="display:none;"></div>
+
+    <div id="messageArea"></div>
+
+    <button id="copyBtn" class="btn btn-copy" style="display:none;" onclick="copyCode()">Copy Code</button>
+
+    <!-- Existing Codes List -->
+    <h2 style="margin-top:50px;">Previously Created Codes</h2>
+    <table class="list-table" id="codesTable">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Name/Purpose</th>
+          <th>Created</th>
+          <th>Used By</th>
+        </tr>
+      </thead>
+      <tbody id="codesBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+// Firebase Config
+const firebaseConfig = {
+  apiKey: "AIzaSyAWsnuljcbCQgly7fhSh_n9_Q1j1ZtC7rU",
+  authDomain: "bdclash-80f60.firebaseapp.com",
+  projectId: "bdclash-80f60",
+  storageBucket: "bdclash-80f60.firebasestorage.app",
+  messagingSenderId: "842550397820",
+  appId: "1:842550397820:web:285ed51565a4d71d34b2f9",
+  measurementId: "G-DS97G2VVZ4"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const messageArea = document.getElementById('messageArea');
+const generatedCodeDiv = document.getElementById('generatedCode');
+const copyBtn = document.getElementById('copyBtn');
+
+function showMessage(text, isSuccess = true) {
+  messageArea.innerHTML = `<div class="message ${isSuccess ? 'success' : 'error'}">${text}</div>`;
+  setTimeout(() => { messageArea.innerHTML = ''; }, 5000);
+}
+
+function generateRandomCode() {
+  return String(Math.floor(1000 + Math.random() * 9000)); // 4 digits 1000-9999
+}
+
+async function generateCode() {
+  const owner = document.getElementById('ownerName').value.trim();
+  
+  if (!owner) {
+    showMessage("দয়া করে Name / Purpose লিখুন", false);
+    return;
+  }
+
+  const code = generateRandomCode();
+
+  try {
+    // চেক করি এই কোড আগে থেকে আছে কি না
+    const existing = await db.collection("invitationCodes").doc(code).get();
+    if (existing.exists) {
+      showMessage("দুর্ভাগ্যবশত এই কোড ইতিমধ্যে তৈরি আছে। আবার চেষ্টা করুন।", false);
+      return;
+    }
+
+    await db.collection("invitationCodes").doc(code).set({
+      code: code,
+      ownerName: owner,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      usedBy: null,           // null = not used yet
+      usedAt: null,
+      active: true
+    });
+
+    generatedCodeDiv.textContent = code;
+    generatedCodeDiv.style.display = 'block';
+    copyBtn.style.display = 'block';
+
+    showMessage(`কোড তৈরি হয়েছে: ${code} (${owner})`);
+
+    loadCodes(); // refresh list
+  } catch (err) {
+    console.error(err);
+    showMessage("কোড তৈরি করতে সমস্যা: " + err.message, false);
+  }
+}
+
+function copyCode() {
+  const code = generatedCodeDiv.textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    showMessage("কোড কপি করা হয়েছে!");
+  }).catch(() => {
+    showMessage("কপি করতে সমস্যা হয়েছে", false);
+  });
+}
+
+// Load all invitation codes
+async function loadCodes() {
+  const tbody = document.getElementById('codesBody');
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px;">Loading...</td></tr>';
+
+  try {
+    const snap = await db.collection("invitationCodes")
+      .orderBy("createdAt", "desc")
+      .limit(50)
+      .get();
+
+    tbody.innerHTML = "";
+
+    if (snap.empty) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px;color:#777;">কোনো কোড তৈরি করা হয়নি</td></tr>';
+      return;
+    }
+
+    snap.forEach(doc => {
+      const d = doc.data();
+      const created = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleString('bn-BD') : '—';
+      const used = d.usedBy ? `হ্যাঁ (${d.usedBy})` : 'না';
+
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><strong>${d.code}</strong></td>
+        <td>${d.ownerName || '—'}</td>
+        <td>${created}</td>
+        <td>${used}</td>
+      `;
+      tbody.appendChild(row);
+    });
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#d32f2f;">লোড করতে সমস্যা</td></tr>';
+    console.error(err);
+  }
+}
+
+window.onload = loadCodes;
+</script>
+
+</body>
+</html>

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin - Pending User Approvals</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
+  <style>
+    * { box-sizing: border-box; margin:0; padding:0; }
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      padding: 15px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 20px auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    header {
+      background: #1a73e8;
+      color: white;
+      padding: 18px 24px;
+      font-size: 1.4rem;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .back-btn {
+      background: rgba(255,255,255,0.25);
+      border: none;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .back-btn:hover { background: rgba(255,255,255,0.4); }
+    .table-container {
+      overflow-x: auto;
+      padding: 0 20px 24px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      min-width: 800px;
+    }
+    th, td {
+      padding: 14px 12px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+    th {
+      background: #f8f9fa;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    tr:hover { background: #f8fcff; }
+    .status-pending {
+      background: #f39c12;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+    .btn-action {
+      padding: 7px 14px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      margin-right: 6px;
+      transition: 0.2s;
+    }
+    .btn-approve {
+      background: #27ae60;
+      color: white;
+    }
+    .btn-approve:hover { background: #219653; }
+    .btn-reject {
+      background: #e74c3c;
+      color: white;
+    }
+    .btn-reject:hover { background: #c0392b; }
+    #loading, #noUsers, #errorMsg {
+      text-align: center;
+      padding: 60px 20px;
+      font-size: 1.1rem;
+      color: #555;
+    }
+    #errorMsg { color: #c0392b; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    Pending User Approvals
+    <button class="back-btn" onclick="window.location.href='admin.html'">← Back to Dashboard</button>
+  </header>
+
+  <div id="loading">Loading pending registrations... Please wait</div>
+  <div id="errorMsg" style="display:none;"></div>
+
+  <div class="table-container" id="tableContainer" style="display:none;">
+    <table id="pendingTable">
+      <thead>
+        <tr>
+          <th>Phone</th>
+          <th>UID (short)</th>
+          <th>Invitation Code</th>
+          <th>Created</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="pendingBody"></tbody>
+    </table>
+  </div>
+
+  <div id="noUsers" style="display:none; padding:60px 20px; text-align:center; font-size:1.1rem; color:#555;">
+    No pending approvals at the moment.
+  </div>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAWsnuljcbCQgly7fhSh_n9_Q1j1ZtC7rU",
+  authDomain: "bdclash-80f60.firebaseapp.com",
+  projectId: "bdclash-80f60",
+  storageBucket: "bdclash-80f60.firebasestorage.app",
+  messagingSenderId: "842550397820",
+  appId: "1:842550397820:web:285ed51565a4d71d34b2f9",
+  measurementId: "G-DS97G2VVZ4"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+async function loadPendingUsers() {
+  const loading = document.getElementById('loading');
+  const tableContainer = document.getElementById('tableContainer');
+  const noUsers = document.getElementById('noUsers');
+  const errorMsg = document.getElementById('errorMsg');
+  const tbody = document.getElementById('pendingBody');
+
+  try {
+    loading.style.display = 'block';
+    tableContainer.style.display = 'none';
+    noUsers.style.display = 'none';
+    errorMsg.style.display = 'none';
+
+    const querySnapshot = await db.collection("users")
+      .where("approved", "==", false)
+      .orderBy("createdAt", "desc")
+      .get();
+
+    tbody.innerHTML = "";
+    loading.style.display = "none";
+
+    if (querySnapshot.empty) {
+      noUsers.style.display = "block";
+      return;
+    }
+
+    tableContainer.style.display = "block";
+
+    querySnapshot.forEach(doc => {
+      const data = doc.data();
+
+      const created = data.createdAt
+        ? new Date(data.createdAt.toDate()).toLocaleString('en-US', {
+            year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+          })
+        : "—";
+
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${data.phone || "—"}</td>
+        <td>${doc.id.slice(0,8)}...</td>
+        <td>${data.invitationCode || "—"}</td>
+        <td>${created}</td>
+        <td><span class="status-pending">Pending</span></td>
+        <td>
+          <button class="btn-action btn-approve" onclick="approveUser('${doc.id}')">Approve</button>
+          <button class="btn-action btn-reject" onclick="rejectUser('${doc.id}')">Reject</button>
+        </td>
+      `;
+      tbody.appendChild(row);
+    });
+  } catch (err) {
+    console.error("Error:", err);
+    loading.style.display = "none";
+    errorMsg.textContent = "Failed to load pending users: " + err.message;
+    errorMsg.style.display = "block";
+  }
+}
+
+async function approveUser(uid) {
+  if (!confirm("Approve this user? They will be able to log in immediately.")) return;
+
+  try {
+    await db.collection("users").doc(uid).update({
+      approved: true,
+      status: "active",
+      approvedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    alert("User approved successfully.");
+    loadPendingUsers(); // refresh list
+  } catch (err) {
+    alert("Failed to approve user: " + err.message);
+  }
+}
+
+async function rejectUser(uid) {
+  if (!confirm("Reject this registration? The user will NOT be able to log in.\n(This action cannot be undone easily.)")) return;
+
+  try {
+    // Option 1: just mark as rejected (recommended)
+    await db.collection("users").doc(uid).update({
+      approved: false,
+      status: "rejected",
+      rejectedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Option 2: delete the document completely (uncomment if desired)
+    // await db.collection("users").doc(uid).delete();
+
+    alert("User registration rejected.");
+    loadPendingUsers(); // refresh
+  } catch (err) {
+    alert("Failed to reject user: " + err.message);
+  }
+}
+
+window.onload = loadPendingUsers;
+</script>
+
+</body>
+</html>
