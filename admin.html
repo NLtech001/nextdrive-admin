@@ -155,6 +155,370 @@
 <div class="sidebar" id="sidebar">
   <ul>
     <li><a href="user.html">View Registered Users</a></li>
+    <li><a href="userapprove.html">User Approve</a></li>
+    <li><a href="deposit.html">Cashin Requests</a></li>
+    <li><a href="withdraw.html">Cashout Requests</a></li>
+    <li><a href="package.html">View Membership</a></li>
+    <li><a href="taskmaker.html">Task Manager</a></li>
+    <li><a href="invitation.html">Invitation Create</a></li>
+  </ul>
+</div>
+
+<div class="overlay" id="overlay"></div>
+
+<!-- নতুন Stats Section -->
+<div class="stats-bar">
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-users"></i></div>
+    <div class="stat-value" id="totalUsers">0</div>
+    <div class="stat-label">Total Registered Users</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-hand-holding-usd"></i></div>
+    <div class="stat-value" id="totalDeposit">৳ 0.00</div>
+    <div class="stat-label">Total Approved Deposits</div>
+  </div>
+</div>
+
+<div class="container">
+  <h1>Add New Car</h1>
+  
+  <form id="carForm">
+    <label for="name">Car Name *</label>
+    <input type="text" id="name" placeholder="e.g. Toyota Corolla" required />
+    
+    <label for="model">Model / Year</label>
+    <input type="text" id="model" placeholder="e.g. 2023 Hybrid" />
+    
+    <label for="price">Price *</label>
+    <input type="text" id="price" placeholder="e.g. ৳ ১৫,০০,০০০" required />
+    
+    <label for="image">Image Direct URL *</label>
+    <input type="text" id="image" placeholder="https://example.com/car.jpg" required />
+    
+    <button type="submit" id="submitBtn" class="primary-btn">Add Car</button>
+  </form>
+  
+  <div id="message" class="message" style="display:none;"></div>
+</div>
+
+<div class="container">
+  <h2>Existing Cars</h2>
+  <div id="carsList" class="cars-list"></div>
+  <div id="noCars" style="text-align:center; padding:40px 16px; color:#777; display:none;">
+    No cars have been added yet.
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+// Admin check
+if (localStorage.getItem('adminLoggedIn') !== 'true') {
+  alert("অ্যাডমিন অ্যাক্সেস নেই। দয়া করে লগইন করুন।");
+  window.location.href = "index.html";
+}
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAWsnuljcbCQgly7fhSh_n9_Q1j1ZtC7rU",
+  authDomain: "bdclash-80f60.firebaseapp.com",
+  projectId: "bdclash-80f60",
+  storageBucket: "bdclash-80f60.firebasestorage.app",
+  messagingSenderId: "842550397820",
+  appId: "1:842550397820:web:285ed51565a4d71d34b2f9",
+  measurementId: "G-DS97G2VVZ4"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Menu & Profile handlers (আগের মতো)
+const menuToggle = document.getElementById('menuToggle');
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('overlay');
+
+menuToggle.addEventListener('click', () => {
+  sidebar.classList.toggle('active');
+  overlay.classList.toggle('active');
+});
+
+overlay.addEventListener('click', () => {
+  sidebar.classList.remove('active');
+  overlay.classList.remove('active');
+});
+
+const profileBtn = document.getElementById('profileBtn');
+const profileDropdown = document.getElementById('profileDropdown');
+
+profileBtn.addEventListener('click', () => {
+  profileDropdown.style.display = profileDropdown.style.display === 'block' ? 'none' : 'block';
+});
+
+document.addEventListener('click', (e) => {
+  if (!profileBtn.contains(e.target) && !profileDropdown.contains(e.target)) {
+    profileDropdown.style.display = 'none';
+  }
+});
+
+function signOut() {
+  if (confirm("আপনি কি সাইন আউট করতে চান?")) {
+    localStorage.removeItem('adminLoggedIn');
+    window.location.href = "index.html";
+  }
+}
+
+// নতুন: Total Users + Total Approved Deposit লোড
+function loadStats() {
+  // 1. Total Registered Users
+  db.collection("users").onSnapshot(snapshot => {
+    document.getElementById("totalUsers").textContent = snapshot.size;
+  });
+
+  // 2. Total Approved Deposits (sum of amount where status === "approved")
+  db.collection("cashin_requests")  // deposit.html-এ যে collection ব্যবহার করা হয়েছে
+    .where("status", "==", "approved")
+    .onSnapshot(snapshot => {
+      let total = 0;
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        total += Number(data.amount || 0);
+      });
+      document.getElementById("totalDeposit").textContent = 
+        "৳ " + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    });
+}
+
+// Car form & list functions (আগের মতো)
+const form = document.getElementById('carForm');
+const messageDiv = document.getElementById('message');
+const submitBtn = document.getElementById('submitBtn');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  const name  = document.getElementById('name').value.trim();
+  const model = document.getElementById('model').value.trim();
+  const price = document.getElementById('price').value.trim();
+  const image = document.getElementById('image').value.trim();
+  
+  if (!name || !price || !image) {
+    showMessage("Name, Price and Image URL are required!", "error");
+    return;
+  }
+  
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Adding...";
+  
+  try {
+    await db.collection("cars").add({
+      name,
+      model: model || "N/A",
+      price,
+      image,
+      createdAt: new Date().toISOString()
+    });
+    
+    showMessage("Car added successfully!", "success");
+    form.reset();
+    loadCars();
+  } catch (err) {
+    showMessage("Failed to add car: " + err.message, "error");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Add Car";
+  }
+});
+
+function showMessage(text, type) {
+  messageDiv.textContent = text;
+  messageDiv.className = "message " + type;
+  messageDiv.style.display = "block";
+  setTimeout(() => messageDiv.style.display = "none", 5000);
+}
+
+async function loadCars() {
+  try {
+    const querySnapshot = await db.collection("cars")
+      .orderBy("createdAt", "desc")
+      .get();
+    
+    const list = document.getElementById("carsList");
+    list.innerHTML = "";
+    
+    if (querySnapshot.empty) {
+      document.getElementById("noCars").style.display = "block";
+      return;
+    }
+    
+    document.getElementById("noCars").style.display = "none";
+    
+    querySnapshot.forEach(doc => {
+      const data = doc.data();
+      const id = doc.id;
+      
+      const card = document.createElement("div");
+      card.className = "car-card";
+      card.innerHTML = `
+        <img src="${data.image}" alt="${data.name}" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'">
+        <div class="car-info">
+          <p><strong>Name:</strong> ${data.name}</p>
+          <p><strong>Model:</strong> ${data.model}</p>
+          <p><strong>Price:</strong> ${data.price}</p>
+        </div>
+        <div class="actions">
+          <button class="delete-btn" onclick="deleteCar('${id}', '${data.name.replace(/'/g, "\\'")}')">Delete</button>
+        </div>
+      `;
+      list.appendChild(card);
+    });
+  } catch (err) {
+    console.error(err);
+    showMessage("Failed to load cars", "error");
+  }
+}
+
+async function deleteCar(docId, carName) {
+  if (!confirm(`Delete "${carName}"? This action cannot be undone.`)) return;
+  
+  try {
+    await db.collection("cars").doc(docId).delete();
+    showMessage("Car deleted", "success");
+    loadCars();
+  } catch (err) {
+    showMessage("Delete failed: " + err.message, "error");
+  }
+}
+
+// Page load
+window.addEventListener('load', () => {
+  loadStats();   // নতুন stats লোড
+  loadCars();
+});
+</script>
+
+</body>
+</html>      top: 50px; right: 16px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      padding: 8px 0;
+      min-width: 160px;
+      display: none;
+      z-index: 1100;
+    }
+
+    .profile-dropdown button {
+      width: 100%; padding: 10px 16px; background: none; border: none;
+      text-align: left; font-size: 0.95rem; cursor: pointer; color: #d32f2f;
+    }
+
+    .profile-dropdown button:hover { background: #ffebee; }
+
+    .sidebar {
+      position: fixed; top: 0; left: -300px; width: 280px; height: 100%;
+      background: rgba(255,255,255,0.25); backdrop-filter: blur(12px);
+      border-right: 1px solid rgba(255,255,255,0.18);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+      transition: left 0.35s ease; z-index: 999; padding-top: 70px;
+    }
+
+    .sidebar.active { left: 0; }
+
+    .sidebar ul { list-style: none; padding: 0 16px; }
+    .sidebar a {
+      display: block; padding: 16px 20px; color: #1a1a1a; text-decoration: none;
+      font-size: 1.05rem; border-radius: 10px; margin-bottom: 8px; transition: all 0.2s;
+    }
+    .sidebar a:hover { background: rgba(255,255,255,0.5); transform: translateX(6px); }
+
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+      z-index: 998; opacity: 0; visibility: hidden; transition: all 0.35s;
+    }
+    .overlay.active { opacity: 1; visibility: visible; }
+
+    /* নতুন: Stats Bar */
+    .stats-bar {
+      margin: 80px auto 30px; /* header + margin */
+      max-width: 900px;
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px 24px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      flex: 1;
+      min-width: 220px;
+      text-align: center;
+      transition: transform 0.2s;
+    }
+
+    .stat-card:hover { transform: translateY(-4px); }
+
+    .stat-icon { font-size: 2.2rem; margin-bottom: 8px; color: #e63939; }
+    .stat-value { font-size: 2.4rem; font-weight: 700; color: #1a1a1a; }
+    .stat-label { font-size: 1rem; color: #64748b; margin-top: 4px; }
+
+    .container {
+      background: white; border-radius: 16px; padding: 24px 16px;
+      margin: 20px auto 40px; max-width: 900px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+
+    h1, h2 { text-align: center; margin-bottom: 20px; color: #1a1a1a; font-size: 1.6rem; }
+    label { display: block; margin: 16px 0 6px; font-weight: 500; color: #444; }
+    input[type="text"], textarea {
+      width: 100%; padding: 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px;
+    }
+    button.primary-btn {
+      width: 100%; margin-top: 20px; padding: 16px; font-size: 17px;
+      background: #e63939; color: white; border: none; border-radius: 8px; cursor: pointer;
+    }
+    .delete-btn { background: #d32f2f; padding: 8px 16px; font-size: 14px; color: white; border: none; border-radius: 6px; cursor: pointer; }
+    .message { margin: 16px 0; padding: 12px; border-radius: 8px; text-align: center; font-size: 15px; }
+    .success { background: #e8f5e9; color: #2e7d32; }
+    .error { background: #ffebee; color: #c62828; }
+
+    .cars-list { display: flex; flex-direction: column; gap: 16px; margin-top: 20px; }
+    .car-card {
+      background: #fafafa; border: 1px solid #eee; border-radius: 12px;
+      padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .car-card img { max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 12px; }
+    .actions { margin-top: 12px; text-align: right; }
+
+    @media (min-width: 768px) {
+      .cars-list { display: none; }
+      table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+      th, td { padding: 14px; text-align: left; border-bottom: 1px solid #eee; }
+      th { background: #f8f9fa; font-weight: 600; }
+      img.preview { max-width: 120px; border-radius: 8px; }
+    }
+    @media (max-width: 767px) { table { display: none; } }
+  </style>
+</head>
+<body>
+
+<header>
+  <button class="menu-btn" id="menuToggle"><i class="fas fa-bars"></i></button>
+  <h1 style="margin:0; font-size:1.4rem;">Admin Dashboard</h1>
+  <div style="position:relative;">
+    <button class="profile-btn" id="profileBtn"><i class="fas fa-user-circle"></i></button>
+    <div class="profile-dropdown" id="profileDropdown">
+      <button onclick="signOut()">Sign Out</button>
+    </div>
+  </div>
+</header>
+
+<div class="sidebar" id="sidebar">
+  <ul>
+    <li><a href="user.html">View Registered Users</a></li>
     <li><a href="deposit.html">Cashin Requests</a></li>
     <li><a href="withdraw.html">Cashout Requests</a></li>
     <li><a href="package.html">View Membership</a></li>
