@@ -1,226 +1,240 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="bn">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Admin - Registered Users</title>
-  
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin - Users Management</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
-    * { box-sizing: border-box; margin:0; padding:0; }
     body {
       font-family: 'Poppins', sans-serif;
       background: #f0f2f5;
-      min-height: 100vh;
-      padding: 15px;
+      margin: 0;
+      padding: 20px;
+      color: #333;
     }
     .container {
-      max-width: 1400px;
-      margin: 20px auto;
+      max-width: 1200px;
+      margin: 0 auto;
       background: white;
-      border-radius: 16px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.08);
-      overflow: hidden;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     }
-    header {
-      background: #1a73e8;
-      color: white;
-      padding: 20px;
+    h1 {
       text-align: center;
-      font-size: 1.5rem;
-      font-weight: 600;
+      color: #1a73e8;
+      margin-bottom: 30px;
+    }
+    .search-container {
+      margin-bottom: 25px;
+      position: relative;
+    }
+    .search-container input {
+      width: 100%;
+      padding: 14px 16px 14px 45px;
+      border: 1px solid #ccc;
+      border-radius: 50px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    .search-container i {
+      position: absolute;
+      left: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #777;
     }
     .table-container {
       overflow-x: auto;
-      padding: 0 20px 20px;
+      border: 1px solid #eee;
+      border-radius: 10px;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 20px;
-      min-width: 900px;
     }
     th, td {
-      padding: 14px 12px;
+      padding: 14px 16px;
       text-align: left;
       border-bottom: 1px solid #eee;
     }
     th {
-      background: #f8f9fa;
+      background: #1a73e8;
+      color: white;
       font-weight: 600;
-      position: sticky;
-      top: 0;
-      z-index: 1;
     }
-    tr:hover { background: #f5faff; }
-    .status {
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 0.85rem;
-      font-weight: 500;
-      color: white;
+    tr:hover {
+      background: #f8fbff;
     }
-    .bronze-free   { background: #CD7F32; }
-    .active        { background: #2ecc71; }
-    .no-membership { background: #e63939; }
-    
+    .empty-state {
+      text-align: center;
+      padding: 60px;
+      color: #777;
+      font-size: 1.1rem;
+    }
     .edit-btn {
-      padding: 6px 12px;
-      background: #3498db;
-      color: white;
+      background: #ffc107;
+      color: #333;
       border: none;
+      padding: 6px 12px;
       border-radius: 6px;
       cursor: pointer;
       font-size: 0.9rem;
     }
     .edit-btn:hover {
-      background: #2980b9;
-    }
-    .back-btn {
-      display: block;
-      margin: 30px auto;
-      padding: 12px 40px;
-      background: #e63939;
+      background: #e0a800;
       color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 1.1rem;
-      cursor: pointer;
-    }
-    #loading, #noUsers {
-      text-align: center;
-      padding: 40px;
-      font-size: 1.1rem;
-      color: #555;
     }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <header>Registered Users List (Admin)</header>
+  <h1>Users Management (Admin)</h1>
 
-  <div id="loading">Loading... Please wait</div>
+  <div class="search-container">
+    <i class="fas fa-search"></i>
+    <input type="text" id="searchInput" placeholder="Phone number দিয়ে সার্চ করুন (যেমন: 01712...)" oninput="filterUsers()">
+  </div>
 
-  <div class="table-container" id="tableContainer" style="display:none;">
-    <table id="usersTable">
+  <div class="table-container">
+    <table>
       <thead>
         <tr>
-          <th>UID</th>
           <th>Phone</th>
-          <th>Name</th>
+          <th>Balance</th>
+          <th>Earnings</th>
           <th>Joined</th>
-          <th>Membership Status</th>
           <th>Action</th>
         </tr>
       </thead>
-      <tbody id="usersBody"></tbody>
+      <tbody id="usersTableBody">
+        <tr><td colspan="5" class="empty-state">Loading users...</td></tr>
+      </tbody>
     </table>
   </div>
-
-  <div id="noUsers" style="display:none;">
-    No registered users found.
-  </div>
-
-  <button class="back-btn" onclick="window.location.href='admin.html'">Back to Admin Panel</button>
 </div>
 
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
 
 <script>
+// Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyAWsnuljcbCQgly7fhSh_n9_Q1j1ZtC7rU",
   authDomain: "bdclash-80f60.firebaseapp.com",
   projectId: "bdclash-80f60",
   storageBucket: "bdclash-80f60.firebasestorage.app",
   messagingSenderId: "842550397820",
-  appId: "1:842550397820:web:285ed51565a4d71d34b2f9",
-  measurementId: "G-DS97G2VVZ4"
+  appId: "1:842550397820:web:285ed51565a4d71d34b2f9"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-async function loadUsers() {
-  const loading = document.getElementById('loading');
-  const tableContainer = document.getElementById('tableContainer');
-  const noUsers = document.getElementById('noUsers');
-  const tbody = document.getElementById('usersBody');
+const tableBody = document.getElementById("usersTableBody");
+const searchInput = document.getElementById("searchInput");
 
-  try {
-    const querySnapshot = await db.collection("users")
-      .orderBy("createdAt", "desc")
-      .get();
+let allUsers = [];
 
-    tbody.innerHTML = "";
-    loading.style.display = "none";
+// Real-time users listener
+db.collection("users")
+  .orderBy("createdAt", "desc")
+  .onSnapshot(snap => {
+    console.log("[DEBUG] Users snapshot received. Count:", snap.size);
+    
+    allUsers = [];
+    tableBody.innerHTML = "";
 
-    if (querySnapshot.empty) {
-      noUsers.style.display = "block";
+    if (snap.empty) {
+      console.log("[DEBUG] No users found in collection");
+      tableBody.innerHTML = '<tr><td colspan="5" class="empty-state">কোনো ইউজার পাওয়া যায়নি</td></tr>';
       return;
     }
 
-    tableContainer.style.display = "block";
-
-    querySnapshot.forEach(doc => {
+    snap.forEach(doc => {
       const data = doc.data();
+      console.log("[DEBUG] User loaded:", doc.id, data.phone);
       
-      // Date formatting
+      allUsers.push({ id: doc.id, ...data });
+
       const joined = data.createdAt 
-        ? new Date(data.createdAt.toDate ? data.createdAt.toDate() : data.createdAt)
-            .toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+        ? new Date(data.createdAt.toMillis()).toLocaleDateString("en-GB")
         : "—";
 
-      // Membership display logic
-      const membership = data.membership || {};
-      const packageName = membership.packageName ? membership.packageName.trim() : "";
-
-      let statusHTML = `<span class="status no-membership">No Membership</span>`;
-      
-      if (packageName !== "") {
-        let statusClass = "active";
-        
-        // Special style for Bronze Free
-        if (packageName.toLowerCase().includes("bronze free")) {
-          statusClass = "bronze-free";
-        }
-        // Add more conditions later if needed
-        // else if (packageName.toLowerCase().includes("gold")) { statusClass = "gold"; }
-
-        statusHTML = `<span class="status ${statusClass}">${packageName}</span>`;
-      }
-
-      const row = document.createElement("tr");
-      row.innerHTML = `
-        <td>${doc.id.slice(0,8)}...</td>
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
         <td>${data.phone || "—"}</td>
-        <td>${data.name || data.displayName || "—"}</td>
+        <td>৳${Number(data.balance || 0).toFixed(2)}</td>
+        <td>৳${Number(data.taskEarnings || 0).toFixed(2)}</td>
         <td>${joined}</td>
-        <td>${statusHTML}</td>
         <td>
           <button class="edit-btn" onclick="editUser('${doc.id}')">
             <i class="fas fa-edit"></i> Edit
           </button>
         </td>
       `;
-      tbody.appendChild(row);
+      tableBody.appendChild(tr);
     });
-  } catch (err) {
-    console.error("Error loading users:", err);
-    loading.innerHTML = "Error loading data: " + err.message;
+  }, err => {
+    console.error("[ERROR] Firestore listener failed:", err.code, err.message);
+    tableBody.innerHTML = `<tr><td colspan="5" class="empty-state" style="color:#dc3545;">
+      Error loading users: ${err.message}<br>
+      (সম্ভবত permission denied - Rules চেক করুন)
+    </td></tr>`;
+  });
+
+// Search filter
+function filterUsers() {
+  const query = searchInput.value.trim().toLowerCase().replace(/\D/g, '');
+  
+  if (!query) {
+    renderUsers(allUsers);
+    return;
   }
+
+  const filtered = allUsers.filter(user => 
+    (user.phone || "").replace(/\D/g, '').includes(query)
+  );
+
+  renderUsers(filtered);
 }
 
+function renderUsers(usersList) {
+  tableBody.innerHTML = "";
+
+  if (usersList.length === 0) {
+    tableBody.innerHTML = '<tr><td colspan="5" class="empty-state">কোনো ইউজার মিলেনি</td></tr>';
+    return;
+  }
+
+  usersList.forEach(user => {
+    const joined = user.createdAt 
+      ? new Date(user.createdAt.toMillis()).toLocaleDateString("en-GB")
+      : "—";
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${user.phone || "—"}</td>
+      <td>৳${Number(user.balance || 0).toFixed(2)}</td>
+      <td>৳${Number(user.taskEarnings || 0).toFixed(2)}</td>
+      <td>${joined}</td>
+      <td>
+        <button class="edit-btn" onclick="editUser('${user.id}')">
+          <i class="fas fa-edit"></i> Edit
+        </button>
+      </td>
+    `;
+    tableBody.appendChild(tr);
+  });
+}
+
+// Edit button redirect
 function editUser(uid) {
   window.location.href = `useredit.html?uid=${uid}`;
 }
-
-window.onload = loadUsers;
 </script>
-
 </body>
 </html>
