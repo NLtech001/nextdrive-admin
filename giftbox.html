@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gift Box Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:Poppins,sans-serif;background:#f4f7fa;margin:0;padding:20px;color:#333}
+    .container{max-width:980px;margin:0 auto;background:white;padding:30px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.08)}
+    h1,h2{text-align:center;color:#1a73e8;margin-bottom:25px}
+    .form-group{margin-bottom:22px}
+    label{display:block;margin-bottom:8px;font-weight:600;color:#444}
+    select,input[type=number],input[type=checkbox]{width:100%;padding:12px;border:1px solid #ccc;border-radius:8px;font-size:16px;box-sizing:border-box}
+    .button-group{display:flex;gap:12px;margin-top:25px}
+    button{flex:1;padding:14px;border:none;border-radius:50px;font-size:17px;font-weight:600;cursor:pointer;transition:all 0.3s}
+    #saveBtn{background:linear-gradient(90deg,#1a73e8,#0d47a1);color:white}
+    #clearBtn{background:#e0e0e0;color:#333}
+    button:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,0,0,0.15)}
+    .success-msg{color:#28a745;text-align:center;margin:20px 0;font-weight:500}
+    .error-msg{color:#dc3545;text-align:center;margin:20px 0;font-weight:500}
+    .note{font-size:0.88rem;color:#666;margin-top:-6px;margin-bottom:18px}
+    .editing-info{text-align:center;color:#1a73e8;font-weight:500;margin:12px 0;font-size:1.05rem;background:#e3f2fd;padding:10px;border-radius:8px}
+    .table-container{margin-top:45px;overflow-x:auto;border:1px solid #eee;border-radius:8px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:14px 16px;text-align:left;border-bottom:1px solid #eee}
+    th{background:#1a73e8;color:white;font-weight:600}
+    tr:hover{background:#f8fbff}
+    .status-enabled{color:#28a745;font-weight:600}
+    .status-disabled{color:#dc3545;font-weight:600}
+    .timestamp{font-size:0.86rem;color:#555}
+    .action-btn{padding:7px 14px;font-size:0.92rem;border-radius:6px;cursor:pointer;border:none;transition:all 0.2s}
+    .edit-btn{background:#ffc107;color:#333}
+    .edit-btn:hover{background:#e0a800;color:white}
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Gift Box Config Admin</h1>
+
+  <div id="editingInfo" class="editing-info" style="display:none;">
+    Editing: <span id="editingHallLevel"></span>
+  </div>
+
+  <div class="form-group">
+    <label for="hall">Hall</label>
+    <select id="hall">
+      <option value="">-- Select --</option>
+      <option value="Bronze">Bronze</option>
+      <option value="Silver">Silver</option>
+      <option value="Gold">Gold</option>
+      <option value="Diamond">Diamond</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label for="level">Level</label>
+    <select id="level">
+      <option value="">-- Select --</option>
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label for="giftAmount">Gift Amount (৳)</label>
+    <input type="number" id="giftAmount" step="1" placeholder="150 বা -50">
+    <div class="note">Negative = balance কমবে</div>
+  </div>
+
+  <div class="form-group">
+    <label for="requiredCompleted">Required Tasks</label>
+    <input type="number" id="requiredCompleted" min="0" value="20" placeholder="20">
+    <div class="note">কত টাস্ক কমপ্লিট হলে আনলক হবে</div>
+  </div>
+
+  <div class="form-group">
+    <label><input type="checkbox" id="enabled" checked> Enabled</label>
+  </div>
+
+  <div class="button-group">
+    <button id="saveBtn" onclick="saveGiftConfig()">Save Config</button>
+    <button id="clearBtn" onclick="clearForm()">Clear</button>
+  </div>
+
+  <div id="message" style="min-height:28px;text-align:center;font-weight:600;"></div>
+
+  <h2>All Gift Boxes</h2>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Hall</th><th>Level</th><th>Gift (৳)</th><th>Required</th><th>Status</th><th>Updated</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="giftTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAWsnuljcbCQgly7fhSh_n9_Q1j1ZtC7rU",
+  authDomain: "bdclash-80f60.firebaseapp.com",
+  projectId: "bdclash-80f60",
+  storageBucket: "bdclash-80f60.firebasestorage.app",
+  messagingSenderId: "842550397820",
+  appId: "1:842550397820:web:285ed51565a4d71d34b2f9"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const messageDiv = document.getElementById("message");
+const tableBody = document.getElementById("giftTableBody");
+const saveBtn = document.getElementById("saveBtn");
+const editingInfo = document.getElementById("editingInfo");
+const editingHallLevel = document.getElementById("editingHallLevel");
+
+let currentEditingId = null;
+
+db.collection("giftConfigs").orderBy("hall").onSnapshot(snap => {
+  tableBody.innerHTML = "";
+  if (snap.empty) {
+    tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#777">কোনো গিফট নেই</td></tr>';
+    return;
+  }
+
+  snap.forEach(doc => {
+    const d = doc.data();
+    const updated = d.updatedAt ? new Date(d.updatedAt.toMillis()).toLocaleString("en-GB",{timeZone:"Asia/Dhaka"}) : "—";
+    const safe = JSON.stringify(d).replace(/'/g,"\\'");
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${d.hall||''}</td>
+      <td>${d.level||''}</td>
+      <td>${d.giftAmount??'—'}</td>
+      <td>${d.requiredCompleted??'—'}</td>
+      <td class="${d.enabled?'status-enabled':'status-disabled'}">${d.enabled?'Enabled':'Disabled'}</td>
+      <td class="timestamp">${updated}</td>
+      <td><button class="action-btn edit-btn" data-id="${doc.id}" data-config='${safe}'>Edit</button></td>
+    `;
+
+    tr.querySelector(".edit-btn").addEventListener("click", e => {
+      const btn = e.currentTarget;
+      try {
+        const config = JSON.parse(btn.dataset.config);
+        loadForm(config, btn.dataset.id);
+      } catch(err) {
+        messageDiv.className = "error-msg";
+        messageDiv.textContent = "লোড করতে সমস্যা";
+      }
+    });
+
+    tableBody.appendChild(tr);
+  });
+}, err => {
+  tableBody.innerHTML = '<tr><td colspan="7" style="color:red;text-align:center;padding:30px">ডাটা লোডে সমস্যা</td></tr>';
+});
+
+function loadForm(data, id) {
+  document.getElementById("hall").value = data.hall || "";
+  document.getElementById("level").value = data.level || "";
+  document.getElementById("giftAmount").value = data.giftAmount ?? "";
+  document.getElementById("requiredCompleted").value = data.requiredCompleted ?? "20";
+  document.getElementById("enabled").checked = !!data.enabled;
+
+  currentEditingId = id;
+  saveBtn.textContent = "Update Config";
+  editingInfo.style.display = "block";
+  editingHallLevel.textContent = `${data.hall||'?'} - Level ${data.level||'?'}`;
+  messageDiv.textContent = "";
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function clearForm() {
+  document.getElementById("hall").value = "";
+  document.getElementById("level").value = "";
+  document.getElementById("giftAmount").value = "";
+  document.getElementById("requiredCompleted").value = "20";
+  document.getElementById("enabled").checked = true;
+  currentEditingId = null;
+  saveBtn.textContent = "Save Config";
+  editingInfo.style.display = "none";
+  messageDiv.textContent = "";
+}
+
+async function saveGiftConfig() {
+  const hall = document.getElementById("hall").value.trim();
+  const level = document.getElementById("level").value.trim();
+  const amount = parseFloat(document.getElementById("giftAmount").value);
+  const req = parseInt(document.getElementById("requiredCompleted").value);
+  const en = document.getElementById("enabled").checked;
+
+  if (!hall || !level) return showMsg("error-msg", "Hall ও Level দরকার");
+  if (isNaN(amount)) return showMsg("error-msg", "Valid Amount দিন");
+  if (isNaN(req) || req < 0) return showMsg("error-msg", "Valid Tasks সংখ্যা দিন");
+
+  const id = currentEditingId || `${hall}-${level}`;
+
+  try {
+    await db.collection("giftConfigs").doc(id).set({
+      hall, level, giftAmount: amount, requiredCompleted: req, enabled: en,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, {merge: true});
+
+    showMsg("success-msg", currentEditingId ? "আপডেট হয়েছে" : "সেভ হয়েছে");
+    setTimeout(clearForm, 1600);
+  } catch(e) {
+    showMsg("error-msg", "Error: " + e.message);
+    console.error(e);
+  }
+}
+
+function showMsg(cls, txt) {
+  messageDiv.className = cls;
+  messageDiv.textContent = txt;
+}
+</script>
+</body>
+</html>
