@@ -7,6 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
+    /* আগের স্টাইল একই রাখা হয়েছে — পরিবর্তনের দরকার নেই */
     * { box-sizing: border-box; margin:0; padding:0; }
     body {
       font-family: 'Poppins', sans-serif;
@@ -126,29 +127,26 @@
       <div class="small-note">নেগেটিভ মান দিলে ব্যালেন্স কমবে (যেমন -১০০)</div>
     </div>
 
-    <!-- Membership / Package Assign + New Demo Disable Option -->
+    <!-- Membership / Page Access Assign -->
     <div class="section">
-      <h2>Assign Membership / Package</h2>
+      <h2>Assign Page Access (Single Page Only)</h2>
       <div class="form-group">
-        <label>Select Package</label>
+        <label>Select Page to Grant Access</label>
         <select id="packageSelect">
-          <option value="">প্যাকেজ লোড হচ্ছে...</option>
+          <option value="">Select one page...</option>
+          <option value="silver1">Silver Hall Level 1 → silver1.html</option>
+          <option value="silver2">Silver Hall Level 2 → silver2.html</option>
+          <option value="silver3">Silver Hall Level 3 → silver3.html</option>
+          <option value="gold1">Gold Hall Level 1 → gold1.html</option>
+          <option value="gold2">Gold Hall Level 2 → gold2.html</option>
+          <option value="gold3">Gold Hall Level 3 → gold3.html</option>
+          <option value="diamond1">Diamond Hall Level 1 → diamond1.html</option>
+          <option value="diamond2">Diamond Hall Level 2 → diamond2.html</option>
+          <option value="diamond3">Diamond Hall Level 3 → diamond3.html</option>
         </select>
       </div>
-      <button class="btn btn-primary" onclick="assignMembership()">Assign This Package</button>
-      <div id="currentMembership" class="current-pkg">Loading current membership...</div>
-
-      <!-- নতুন যোগ করা অংশ: Disappear Demo Balance -->
-      <div style="margin-top: 32px; padding-top: 20px; border-top: 1px dashed #999;">
-        <h3>Advanced Balance Control</h3>
-        <button class="btn btn-delete" onclick="disableDemoBalance()">
-          Disappear Demo Balance (Permanent)
-        </button>
-        <p class="small-note" style="margin-top: 10px;">
-          এই বাটন চাপলে ঐ ইউজারের অ্যাকাউন্টে আর কখনো demo balance (১০০০০) যোগ হবে না।<br>
-          শুধু real balance দেখাবে (real balance না থাকলে ০ দেখাবে)।
-        </p>
-      </div>
+      <button class="btn btn-primary" onclick="assignMembership()">Assign This Page Access</button>
+      <div id="currentMembership" class="current-pkg">Loading current access...</div>
     </div>
 
     <!-- Ban / Unban -->
@@ -184,7 +182,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-// Firebase Config
+// Firebase Config (আগের মতোই)
 const firebaseConfig = {
   apiKey: "AIzaSyAWsnuljcbCQgly7fhSh_n9_Q1j1ZtC7rU",
   authDomain: "bdclash-80f60.firebaseapp.com",
@@ -217,9 +215,7 @@ function showError(msg) {
   document.getElementById('uidDisplay').textContent = 'Error';
 }
 
-// =============================================
 // Load User Data
-// =============================================
 async function loadUser() {
   try {
     const docRef = db.collection("users").doc(uid);
@@ -249,43 +245,34 @@ async function loadUser() {
     document.getElementById('currentBalance').innerHTML = 
       `৳ ${balance.toLocaleString('bn-BD')} ${balance < 0 ? ' <span style="color:#d32f2f">(ঋণাত্মক)</span>' : ''}`;
 
-    // Membership
+    // Current Page Access / Membership
     updateCurrentMembershipDisplay(data.membership || null);
 
     // Load additional data
     loadLoginHistory();
-    loadPackages();
   } catch (e) {
     console.error("Load user error:", e);
     showError("ইউজার লোড করতে সমস্যা: " + e.message);
   }
 }
 
-// =============================================
 // Update Current Membership Display
-// =============================================
 function updateCurrentMembershipDisplay(membership) {
   const elem = document.getElementById('currentMembership');
-  if (!membership || !membership.packageName) {
-    elem.innerHTML = "কোনো সক্রিয় প্যাকেজ নেই";
+  if (!membership || !membership.pageKey) {
+    elem.innerHTML = "কোনো পেজ অ্যাক্সেস দেওয়া হয়নি";
     return;
   }
 
-  const expires = membership.expiresAt 
-    ? new Date(membership.expiresAt).toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric' })
-    : '—';
-
   elem.innerHTML = `
-    <strong>প্যাকেজ:</strong> ${membership.packageName}<br>
+    <strong>Current Access:</strong> ${membership.pageName || membership.pageKey}<br>
     <strong>Hall:</strong> ${membership.hall || '—'} • 
     <strong>Level:</strong> ${membership.level || '—'}<br>
-    <strong>মেয়াদ শেষ:</strong> ${expires}
+    <strong>Assigned:</strong> ${membership.assignedAt ? new Date(membership.assignedAt.toDate()).toLocaleString('bn-BD') : '—'}
   `;
 }
 
-// =============================================
-// Save Basic Info
-// =============================================
+// Save Basic Info (আগের মতো)
 async function saveBasicInfo() {
   try {
     const updates = {};
@@ -306,9 +293,7 @@ async function saveBasicInfo() {
   }
 }
 
-// =============================================
-// Toggle Ban / Unban
-// =============================================
+// Toggle Ban / Unban (আগের মতো)
 async function toggleBan() {
   try {
     const doc = await db.collection("users").doc(uid).get();
@@ -317,83 +302,56 @@ async function toggleBan() {
     await db.collection("users").doc(uid).update({ banned: !isBanned });
 
     alert(!isBanned ? "User has been BANNED!" : "User has been UNBANNED!");
-    loadUser(); // refresh UI
+    loadUser();
   } catch (e) {
     alert("Error: " + e.message);
   }
 }
 
-// =============================================
-// Load Packages for Dropdown
-// =============================================
-async function loadPackages() {
-  const select = document.getElementById('packageSelect');
-  select.innerHTML = '<option value="">প্যাকেজ সিলেক্ট করুন...</option>';
-
-  try {
-    const snap = await db.collection("packages").get();
-    
-    if (snap.empty) {
-      select.innerHTML += '<option disabled>কোনো প্যাকেজ পাওয়া যায়নি</option>';
-      return;
-    }
-
-    snap.forEach(doc => {
-      const p = doc.data();
-      const opt = document.createElement('option');
-      opt.value = doc.id;
-      opt.textContent = `${p.name || 'Unnamed'} • ${p.hall || '?'} - ${p.level || '?'} • ৳${p.price || '?'} / ${p.durationDays || '?'} দিন`;
-      select.appendChild(opt);
-    });
-  } catch (e) {
-    console.error("Packages load error:", e);
-    select.innerHTML += '<option disabled>প্যাকেজ লোডে সমস্যা</option>';
-  }
-}
-
-// =============================================
-// Assign Package
-// =============================================
+// Assign Page Access (নতুন লজিক)
 async function assignMembership() {
-  const packageId = document.getElementById('packageSelect').value;
-  if (!packageId) return alert("একটা প্যাকেজ সিলেক্ট করুন");
+  const selected = document.getElementById('packageSelect').value;
+  if (!selected) return alert("একটা পেজ সিলেক্ট করুন");
+
+  const mapping = {
+    "silver1":   { pageName: "Silver Hall Level 1", hall: "silver",   level: "1" },
+    "silver2":   { pageName: "Silver Hall Level 2", hall: "silver",   level: "2" },
+    "silver3":   { pageName: "Silver Hall Level 3", hall: "silver",   level: "3" },
+    "gold1":     { pageName: "Gold Hall Level 1",   hall: "gold",     level: "1" },
+    "gold2":     { pageName: "Gold Hall Level 2",   hall: "gold",     level: "2" },
+    "gold3":     { pageName: "Gold Hall Level 3",   hall: "gold",     level: "3" },
+    "diamond1":  { pageName: "Diamond Hall Level 1",hall: "diamond",  level: "1" },
+    "diamond2":  { pageName: "Diamond Hall Level 2",hall: "diamond",  level: "2" },
+    "diamond3":  { pageName: "Diamond Hall Level 3",hall: "diamond",  level: "3" }
+  };
+
+  const info = mapping[selected];
+  if (!info) return alert("Invalid selection");
 
   try {
-    const pkgDoc = await db.collection("packages").doc(packageId).get();
-    if (!pkgDoc.exists) return alert("নির্বাচিত প্যাকেজ পাওয়া যায়নি");
-
-    const pkg = pkgDoc.data();
-
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + (Number(pkg.durationDays) || 30));
-
     const membershipData = {
-      packageId:        packageId,
-      packageName:      pkg.name || "Unknown Package",
-      hall:             pkg.hall   || "Bronze",
-      level:            pkg.level  || "Level 1",
-      assignedAt:       firebase.firestore.FieldValue.serverTimestamp(),
-      expiresAt:        expiresAt.toISOString(),
-      price:            Number(pkg.price) || 0,
-      durationDays:     Number(pkg.durationDays) || 30
+      pageKey:      selected,
+      pageName:     info.pageName,
+      hall:         info.hall,
+      level:        info.level,
+      assignedAt:   firebase.firestore.FieldValue.serverTimestamp(),
+      // expiresAt বা duration যদি পরে লাগে তাহলে যোগ করা যাবে
     };
 
     await db.collection("users").doc(uid).update({
       membership: membershipData
     });
 
-    alert(`✅ প্যাকেজ অ্যাসাইন করা হয়েছে!\n${membershipData.packageName} (${membershipData.hall} • ${membershipData.level})`);
+    alert(`✅ Page access assigned!\n${info.pageName} (${info.hall} • Level ${info.level})`);
 
-    loadUser();
+    loadUser(); // refresh UI
   } catch (e) {
     console.error("Assign error:", e);
-    alert("প্যাকেজ অ্যাসাইন করতে সমস্যা: " + e.message);
+    alert("অ্যাসাইন করতে সমস্যা: " + e.message);
   }
 }
 
-// =============================================
-// Update Balance
-// =============================================
+// Update Balance (আগের মতো)
 async function updateBalance() {
   const amountInput = document.getElementById('balanceAmount');
   const amountStr = amountInput.value.trim();
@@ -418,13 +376,10 @@ async function updateBalance() {
     loadUser();
   } catch (e) {
     alert("Balance আপডেটে সমস্যা: " + e.message);
-    console.error(e);
   }
 }
 
-// =============================================
-// Disable Demo Balance (Permanent)
-// =============================================
+// Disable Demo Balance (আগের মতো)
 async function disableDemoBalance() {
   if (!confirm("⚠️ এই ইউজারের demo balance স্থায়ীভাবে বন্ধ করে দিতে চান?\nএটা পরে ফিরিয়ে আনা যাবে না।")) {
     return;
@@ -435,17 +390,14 @@ async function disableDemoBalance() {
       demoMode: false
     });
 
-    alert("✅ Demo balance permanently disabled!\nএখন থেকে শুধু real balance দেখাবে।");
-    loadUser(); // UI refresh
+    alert("✅ Demo balance permanently disabled!");
+    loadUser();
   } catch (e) {
-    console.error("Disable demo error:", e);
     alert("সমস্যা হয়েছে: " + e.message);
   }
 }
 
-// =============================================
-// Load Login History
-// =============================================
+// Load Login History (আগের মতো)
 async function loadLoginHistory() {
   const tbody = document.getElementById('historyBody');
   tbody.innerHTML = '<tr><td style="text-align:center;color:#777;">Loading...</td></tr>';
@@ -479,16 +431,14 @@ async function loadLoginHistory() {
   }
 }
 
-// =============================================
-// Delete Account
-// =============================================
+// Delete Account (আগের মতো)
 async function deleteAccount() {
   if (!confirm("⚠️ এই অ্যাকাউন্ট পুরোপুরি মুছে ফেলতে চান?\nএটা ফিরিয়ে আনা যাবে না!")) return;
 
   try {
     await db.collection("users").doc(uid).delete();
     alert("✅ Account permanently deleted!");
-    window.location.href = "admin-users.html"; // ← আপনার users list page এর নাম দিন
+    window.location.href = "admin-users.html"; // আপনার users list page এর নাম দিন
   } catch (e) {
     alert("Delete করতে সমস্যা: " + e.message);
   }
