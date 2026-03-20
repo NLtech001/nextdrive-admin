@@ -59,26 +59,19 @@
         <label for="hall">Hall *</label>
         <select id="hall" required>
           <option value="">Select Hall</option>
-          <option value="Bronze Hall">Bronze Hall</option>
-          <option value="Silver Hall">Silver Hall</option>
-          <option value="Gold Hall">Gold Hall</option>
-          <option value="Diamond Hall">Diamond Hall</option>
+          <option value="Silver">Silver Hall</option>
+          <option value="Gold">Gold Hall</option>
+          <option value="Diamond">Diamond Hall</option>
         </select>
-      </div>
-
-      <div class="form-group">
-        <label for="name">Package Name *</label>
-        <input type="text" id="name" placeholder="যেমন: Monthly VIP, Basic Plan" required />
       </div>
 
       <div class="form-group">
         <label for="level">Level *</label>
         <select id="level" required>
           <option value="">Select Level</option>
-          <option value="Free Level">Free Level</option>
-          <option value="Level-1">Level-1</option>
-          <option value="Level-2">Level-2</option>
-          <option value="Level-3">Level-3</option>
+          <option value="1">Level-1</option>
+          <option value="2">Level-2</option>
+          <option value="3">Level-3</option>
         </select>
       </div>
 
@@ -95,16 +88,6 @@
       <div class="form-group">
         <label for="commissionRate">Commission Rate (%) *</label>
         <input type="number" id="commissionRate" placeholder="যেমন: 10" min="0" max="100" step="0.1" required />
-      </div>
-
-      <div class="form-group">
-        <label for="priceMultiplier">Price Multiplier *</label>
-        <input type="number" id="priceMultiplier" step="0.01" value="1.00" min="0.1" required />
-      </div>
-
-      <div class="form-group">
-        <label for="commissionMultiplier">Commission Multiplier *</label>
-        <input type="number" id="commissionMultiplier" step="0.01" value="1.00" min="0.1" required />
       </div>
 
       <div class="form-group">
@@ -141,26 +124,19 @@
         <label for="editHall">Hall *</label>
         <select id="editHall" required>
           <option value="">Select Hall</option>
-          <option value="Bronze Hall">Bronze Hall</option>
-          <option value="Silver Hall">Silver Hall</option>
-          <option value="Gold Hall">Gold Hall</option>
-          <option value="Diamond Hall">Diamond Hall</option>
+          <option value="Silver">Silver Hall</option>
+          <option value="Gold">Gold Hall</option>
+          <option value="Diamond">Diamond Hall</option>
         </select>
-      </div>
-
-      <div class="form-group">
-        <label for="editName">Package Name *</label>
-        <input type="text" id="editName" required />
       </div>
 
       <div class="form-group">
         <label for="editLevel">Level *</label>
         <select id="editLevel" required>
           <option value="">Select Level</option>
-          <option value="Free Level">Free Level</option>
-          <option value="Level-1">Level-1</option>
-          <option value="Level-2">Level-2</option>
-          <option value="Level-3">Level-3</option>
+          <option value="1">Level-1</option>
+          <option value="2">Level-2</option>
+          <option value="3">Level-3</option>
         </select>
       </div>
 
@@ -180,16 +156,6 @@
       </div>
 
       <div class="form-group">
-        <label for="editPriceMultiplier">Price Multiplier *</label>
-        <input type="number" id="editPriceMultiplier" step="0.01" min="0.1" required />
-      </div>
-
-      <div class="form-group">
-        <label for="editCommissionMultiplier">Commission Multiplier *</label>
-        <input type="number" id="editCommissionMultiplier" step="0.01" min="0.1" required />
-      </div>
-
-      <div class="form-group">
         <label for="editTaskCount">Task Count (optional)</label>
         <input type="number" id="editTaskCount" min="0" />
       </div>
@@ -204,7 +170,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-// Admin auth check (আপনার সিস্টেম অনুযায়ী রাখা হয়েছে)
+// Admin auth check
 if (localStorage.getItem('adminLoggedIn') !== 'true') {
   alert("অ্যাডমিন অ্যাক্সেস নেই। দয়া করে লগইন করুন।");
   window.location.href = "index.html";
@@ -231,19 +197,21 @@ const submitBtn = document.getElementById('submitBtn');
 addForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
+  const hallValue = document.getElementById('hall').value.trim();
+  const levelValue = document.getElementById('level').value.trim();
+
   const values = {
-    hall:                document.getElementById('hall').value.trim(),
-    name:                document.getElementById('name').value.trim(),
-    level:               document.getElementById('level').value.trim(),
-    price:               Number(document.getElementById('price').value),
-    durationDays:        Number(document.getElementById('durationDays').value),
-    commissionRate:      Number(document.getElementById('commissionRate').value),
-    priceMultiplier:     Number(document.getElementById('priceMultiplier').value),
-    commissionMultiplier: Number(document.getElementById('commissionMultiplier').value),
-    taskCount:           Number(document.getElementById('taskCount').value) || 0
+    hall: hallValue,
+    level: levelValue,
+    price: Number(document.getElementById('price').value),
+    durationDays: Number(document.getElementById('durationDays').value),
+    commissionRate: Number(document.getElementById('commissionRate').value),
+    taskCount: Number(document.getElementById('taskCount').value) || 0,
+    // স্বয়ংক্রিয় নাম তৈরি করা হচ্ছে
+    name: `${hallValue} Level-${levelValue}`
   };
 
-  if (!values.hall || !values.name || !values.level || isNaN(values.price) || isNaN(values.durationDays) || isNaN(values.commissionRate)) {
+  if (!values.hall || !values.level || isNaN(values.price) || isNaN(values.durationDays) || isNaN(values.commissionRate)) {
     showMessage("সব আবশ্যিক ফিল্ড পূরণ করুন", "error");
     return;
   }
@@ -297,19 +265,21 @@ editForm.addEventListener('submit', async (e) => {
   const docId = document.getElementById('editDocId').value;
   if (!docId) return;
 
+  const hallValue = document.getElementById('editHall').value.trim();
+  const levelValue = document.getElementById('editLevel').value.trim();
+
   const values = {
-    hall:                document.getElementById('editHall').value.trim(),
-    name:                document.getElementById('editName').value.trim(),
-    level:               document.getElementById('editLevel').value.trim(),
-    price:               Number(document.getElementById('editPrice').value),
-    durationDays:        Number(document.getElementById('editDurationDays').value),
-    commissionRate:      Number(document.getElementById('editCommissionRate').value),
-    priceMultiplier:     Number(document.getElementById('editPriceMultiplier').value),
-    commissionMultiplier: Number(document.getElementById('editCommissionMultiplier').value),
-    taskCount:           Number(document.getElementById('editTaskCount').value) || 0
+    hall: hallValue,
+    level: levelValue,
+    price: Number(document.getElementById('editPrice').value),
+    durationDays: Number(document.getElementById('editDurationDays').value),
+    commissionRate: Number(document.getElementById('editCommissionRate').value),
+    taskCount: Number(document.getElementById('editTaskCount').value) || 0,
+    // স্বয়ংক্রিয় নাম আপডেট
+    name: `${hallValue} Level-${levelValue}`
   };
 
-  if (!values.hall || !values.name || !values.level || isNaN(values.price) || isNaN(values.durationDays)) {
+  if (!values.hall || !values.level || isNaN(values.price) || isNaN(values.durationDays)) {
     showMessage("সব আবশ্যিক ফিল্ড পূরণ করুন", "error");
     return;
   }
@@ -364,14 +334,15 @@ async function loadPackages() {
       card.className = "package-card";
       card.innerHTML = `
         <div class="package-info">
-          <h3>${d.hall} • ${d.name}</h3>
+          <h3>${d.name || (d.hall + " - " + d.level)}</h3>
+          <p><strong>Hall:</strong> ${d.hall || "—"}</p>
           <p><strong>Level:</strong> ${d.level || "—"}</p>
           <p><strong>মূল্য:</strong> ৳${d.price || 0} • ${d.durationDays || "?"} দিন</p>
           <p><strong>কমিশন:</strong> ${d.commissionRate || 0}% • Tasks: ${d.taskCount || 0}</p>
         </div>
         <div class="actions">
           <button class="edit-btn" onclick="editPackage('${id}')">Edit</button>
-          <button class="delete-btn" onclick="deletePackage('${id}', '${(d.hall + " - " + d.name).replace(/'/g, "\\'")}')">Delete</button>
+          <button class="delete-btn" onclick="deletePackage('${id}', '${(d.name || d.hall + " Level-" + d.level).replace(/'/g, "\\'")}')">Delete</button>
         </div>
       `;
       container.appendChild(card);
@@ -394,13 +365,10 @@ async function editPackage(docId) {
 
     document.getElementById('editDocId').value          = docId;
     document.getElementById('editHall').value           = d.hall || '';
-    document.getElementById('editName').value           = d.name || '';
     document.getElementById('editLevel').value          = d.level || '';
     document.getElementById('editPrice').value          = d.price || '';
     document.getElementById('editDurationDays').value   = d.durationDays || 30;
     document.getElementById('editCommissionRate').value = d.commissionRate || '';
-    document.getElementById('editPriceMultiplier').value = d.priceMultiplier || 1;
-    document.getElementById('editCommissionMultiplier').value = d.commissionMultiplier || 1;
     document.getElementById('editTaskCount').value      = d.taskCount || 0;
 
     openModal();
